@@ -8,7 +8,13 @@ html(lang="en")
         title Zoom
     body
         header
-            h1 hello
+            h1 Zoom
         main
-            h3 Welcome to Zoom
+            form#nickname
+                input(type="text", placeholder="Choose a nickname", required)
+                button Save
+            ul
+            form#message
+                input(type="text", placeholder="Write a message", required)
+                button Send
         script(src="/public/js/app.js") 
