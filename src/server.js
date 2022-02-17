@@ -1,6 +1,6 @@
 import http from "http";
 import express from "express";
-import WebSocket from "ws";
+import { Server } from "socket.io";
 
 const app = express();
 const PORT = 3000;
@@ -12,30 +12,45 @@ app.get("/", (req, res) => res.render("home"));
 app.get("/*", (req, res) => res.redirect("/"));
 
 const server = http.createServer(app);
-const ws = new WebSocket.Server({ server });
+const io = new Server(server);
 
-const sockets = [];
-
-ws.on("connection", (socket) => {
-  sockets.push(socket);
-  socket["nickname"] = "Anon";
-  console.log("Connected to Browser ✅");
-  socket.on("close", () => {
-    console.log("Disconnected from Browser ❌");
-  });
-  socket.on("message", (aMessage) => {
-    const message = JSON.parse(aMessage.toString("utf8"));
-    switch (message.type) {
-      case "nickname":
-        socket["nickname"] = message.payload;
-        break;
-      case "message":
-        sockets.forEach((aSocket) => {
-          if (socket.nickname !== aSocket.nickname)
-            aSocket.send(`${socket.nickname}: ${message.payload}`);
-        });
-        break;
+const publicRooms = () => {
+  const {
+    sockets: {
+      adapter: { sids, rooms },
+    },
+  } = io;
+  const publicRooms = [];
+  rooms.forEach((_, key) => {
+    if (sids.get(key) === undefined) {
+      publicRooms.push(key);
     }
+  });
+  return publicRooms;
+};
+
+io.on("connection", (socket) => {
+  socket.onAny((event) => {
+    console.log(`Socket Event: ${event}`);
+  });
+  socket.on("nickname", (nickname, done) => {
+    socket["nickname"] = nickname;
+    done();
+  });
+  socket.on("join", (room, done) => {
+    socket.join(room);
+    socket.to(room).emit("welcome", socket.nickname);
+    io.sockets.emit("change", publicRooms());
+    done();
+  });
+  socket.on("leave", (room, done) => {
+    socket.leave(room);
+    socket.to(room).emit("bye", socket.nickname);
+    io.sockets.emit("change", publicRooms());
+    done();
+  });
+  socket.on("message", (message, room) => {
+    socket.to(room).emit("message", message, socket.nickname);
   });
 });
 
