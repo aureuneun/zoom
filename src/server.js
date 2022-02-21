@@ -14,43 +14,19 @@ app.get("/*", (req, res) => res.redirect("/"));
 const server = http.createServer(app);
 const io = new Server(server);
 
-const publicRooms = () => {
-  const {
-    sockets: {
-      adapter: { sids, rooms },
-    },
-  } = io;
-  const publicRooms = [];
-  rooms.forEach((_, key) => {
-    if (sids.get(key) === undefined) {
-      publicRooms.push(key);
-    }
-  });
-  return publicRooms;
-};
-
 io.on("connection", (socket) => {
-  socket.onAny((event) => {
-    console.log(`Socket Event: ${event}`);
+  socket.on("join_room", (roomName) => {
+    socket.join(roomName);
+    socket.to(roomName).emit("welcome");
   });
-  socket.on("nickname", (nickname, done) => {
-    socket["nickname"] = nickname;
-    done();
+  socket.on("offer", (offer, roomName) => {
+    socket.to(roomName).emit("offer", offer);
   });
-  socket.on("join", (room, done) => {
-    socket.join(room);
-    socket.to(room).emit("welcome", socket.nickname);
-    io.sockets.emit("change", publicRooms());
-    done();
+  socket.on("answer", (answer, roomName) => {
+    socket.to(roomName).emit("answer", answer);
   });
-  socket.on("leave", (room, done) => {
-    socket.leave(room);
-    socket.to(room).emit("bye", socket.nickname);
-    io.sockets.emit("change", publicRooms());
-    done();
-  });
-  socket.on("message", (message, room) => {
-    socket.to(room).emit("message", message, socket.nickname);
+  socket.on("ice", (ice, roomName) => {
+    socket.to(roomName).emit("ice", ice);
   });
 });
 
